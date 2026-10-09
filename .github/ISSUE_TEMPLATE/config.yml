@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 先读文档
+    url: https://github.com/owod-bin/csins-llm-manager#readme
+    about: 安装、启动、API 用法、多引擎接入、上下文保护与安全说明都在 README 里
+  - name: 🔐 安全漏洞
+    url: https://github.com/owod-bin/csins-llm-manager/security/advisories/new
+    about: 请勿用公开 Issue 报告安全问题，改用私密渠道

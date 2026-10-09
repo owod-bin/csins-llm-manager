@@ -4,6 +4,11 @@
 
 > **仓库地址**：<https://github.com/owod-bin/csins-llm-manager> ｜ 许可：[MIT](LICENSE)
 
+[![CI](https://github.com/owod-bin/csins-llm-manager/actions/workflows/ci.yml/badge.svg)](https://github.com/owod-bin/csins-llm-manager/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)](#安装)
+
 ## 目录结构
 
 ```
@@ -28,16 +33,24 @@ llm-manager/
 │   ├── index.html          # 管理界面（单文件，无构建步骤）
 │   ├── user.html           # 普通用户自助页
 │   └── autologin.html      # 免登录跳转页
+├── .github/                # CI 工作流 + Issue / Pull Request 模板
+├── scripts/
+│   └── check_secrets.py    # 敏感信息扫描（CI 门禁，也可本地运行）
+├── CHANGELOG.md            # 更新日志
+├── CONTRIBUTING.md         # 贡献指南
+├── LICENSE                 # MIT 许可证
 └── data/                   # 运行时数据（首次运行自动生成，已在 .gitignore 中忽略）
 ```
 
 ## 安装
 
 ```bash
-git clone <本仓库地址>
-cd llm-manager
+git clone https://github.com/owod-bin/csins-llm-manager.git
+cd csins-llm-manager
 pip install -r requirements.txt
 ```
+
+要求 **Python 3.10+**，仅依赖 `flask` / `requests` / `psutil`。
 
 （可选）复制配置模板并按实际路径修改；**留空的项会使用项目目录下的默认相对路径**：
 
@@ -329,12 +342,35 @@ llama-server 在输入超出窗口时会直接返回 `400 exceed_context_size_er
 - `DELETE /api/logs/<id>`           删除单条日志（管理员）
 - `DELETE /api/logs`                清空日志（管理员）
 
+## 参与贡献
+
+欢迎提交 Issue 与 Pull Request。
+
+- 动手前请先读 [`CONTRIBUTING.md`](CONTRIBUTING.md)，其中写明了本地开发方式，以及
+  **不可触碰的红线**——禁止提交 `data/`、真实凭据、内网 IP 与本机绝对路径。
+- 提交前自检：
+
+  ```bash
+  python -m compileall -q .          # 语法检查
+  python scripts/check_secrets.py    # 敏感信息扫描（与 CI 门禁同一脚本）
+  ```
+
+- 缺陷请用 [Bug 模板](.github/ISSUE_TEMPLATE/bug_report.yml)，功能建议请用
+  [Feature 模板](.github/ISSUE_TEMPLATE/feature_request.yml)。
+  **安全漏洞请勿开公开 Issue**，改用
+  [私密报告渠道](https://github.com/owod-bin/csins-llm-manager/security/advisories/new)。
+- CI 会在 Python 3.10 ~ 3.13 上逐一检查语法与模块导入，并扫描误提交的敏感信息。
+
+## 更新日志
+
+版本变更记录见 [`CHANGELOG.md`](CHANGELOG.md)，当前版本 **v1.0.0**。
+
 ## 开源许可
 
 本项目采用 [MIT License](LICENSE) 开源。
 
 - **仓库地址**：<https://github.com/owod-bin/csins-llm-manager>
-- **反馈与贡献**：欢迎提交 Issue，也欢迎 Pull Request。
+- **反馈与贡献**：欢迎提交 Issue，也欢迎 Pull Request（详见[贡献指南](CONTRIBUTING.md)）。
 
 快速获取源码：
 

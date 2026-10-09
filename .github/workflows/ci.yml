@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------- 语法与导入
+  syntax:
+    name: 语法与导入检查 (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 编译全部 Python 源文件
+        run: python -m compileall -q .
+
+      - name: 导入核心模块
+        run: |
+          python -c "import app.config, app.store, app.netinfo, app.active_reqs, app.monitor, app.server_manager, app.gateway, app.admin; print('全部模块导入成功')"
+
+      - name: 管理端与网关可实例化
+        run: |
+          python -c "import os, sys; sys.path.insert(0, os.getcwd()); from app import admin, gateway; assert hasattr(admin, 'app') and hasattr(gateway, 'app'); print('Flask 应用实例化成功')"
+
+      - name: 配置默认值可用（无 config.json 也能加载）
+        run: |
+          python -c "from app.config import CFG; import os; assert CFG['manager_port'] and CFG['gateway_port']; print('默认配置加载成功:', {k: CFG[k] for k in ('manager_port', 'gateway_port', 'internal_port_start')})"
+
+  # ---------------------------------------------------------------- 敏感信息门禁
+  secret-scan:
+    name: 敏感信息扫描
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 扫描误提交的密钥 / 内网 IP / 本机绝对路径
+        run: python scripts/check_secrets.py
+
+      - name: 确认运行时数据未被跟踪
+        run: |
+          fail=0
+          for p in data config.json _mgr.log logs; do
+            if git ls-files --error-unmatch "$p" >/dev/null 2>&1; then
+              echo "::error::运行时数据不应被跟踪：$p"
+              fail=1
+            fi
+          done
+          exit $fail
+
+  # ---------------------------------------------------------------- 验证脚本
+  scripts:
+    name: 验证脚本可编译
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 编译仓库内的验证 / 诊断脚本
+        run: |
+          files=$(ls _*.py 2>/dev/null || true)
+          if [ -z "$files" ]; then
+            echo "未发现验证脚本，跳过"
+            exit 0
+          fi
+          python -m py_compile $files
+          echo "验证脚本语法检查通过："
+          echo "$files"

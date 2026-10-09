@@ -1,0 +1,125 @@
+name: 🐛 缺陷报告
+description: 报告一个可复现的缺陷
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！提交前请先搜索现有 Issue，确认没有重复。
+
+        > ⚠️ **请勿粘贴任何真实凭据**（API Key、管理员密码、内网 IP）。
+        > 日志中的 Key 请用 `sk-***` 代替，IP 请用 `192.168.x.x` 代替。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 清楚、简洁地说明你遇到的问题
+      placeholder: 我在做什么的时候，遇到了什么问题
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 执行 python run.py
+        2. 打开 http://127.0.0.1:9090
+        3. 点击「模型管理 → 启动」
+        4. 看到报错
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为 / 报错信息
+      description: 请附完整错误文本；HTTP 错误请给出状态码与响应体
+      render: shell
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及模块
+      multiple: true
+      options:
+        - 管理后台界面
+        - OpenAI 网关（鉴权 / 路由 / 流式）
+        - 上下文保护 / 裁剪
+        - 工具调用（Agent）
+        - 用量统计 Dashboard
+        - 模型 / 引擎进程管理
+        - 权限与账户
+        - 其他
+    validations:
+      required: true
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: 涉及的推理引擎
+      options:
+        - llama.cpp
+        - PrismML fork（三值量化）
+        - vLLM
+        - Ollama / LM Studio 等外部服务
+        - 自定义命令
+        - 与引擎无关
+        - 不适用
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 项目版本 / 提交
+      placeholder: 例如 v1.0.0 或 4dd42ac
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: 操作系统
+      placeholder: 例如 Windows 11 24H2 / Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: input
+    id: python
+    attributes:
+      label: Python 版本
+      description: 输出 `python --version`
+      placeholder: 例如 3.12.4
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 管理进程日志 `_mgr.log`、模型日志，或浏览器控制台输出（请脱敏后粘贴）
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索过现有 Issue，确认没有重复
+          required: true
+        - label: 我已移除日志 / 截图中的 API Key、密码、内网 IP 等敏感信息
+          required: true
