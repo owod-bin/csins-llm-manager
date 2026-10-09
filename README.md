@@ -2,6 +2,8 @@
 
 基于 **Python + Flask** 的中文 Web 管理后台，用于统一管理本地大模型部署（支持 llama.cpp / PrismML fork / vLLM / 自定义命令，以及 Ollama / LM Studio / OpenAI 兼容等外部服务），并提供 OpenAI 兼容网关与每 Key 用量统计。
 
+> **仓库地址**：<https://github.com/owod-bin/csins-llm-manager> ｜ 许可：[MIT](LICENSE)
+
 ## 目录结构
 
 ```
@@ -331,9 +333,15 @@ llama-server 在输入超出窗口时会直接返回 `400 exceed_context_size_er
 
 本项目采用 [MIT License](LICENSE) 开源。
 
-## 贡献
+- **仓库地址**：<https://github.com/owod-bin/csins-llm-manager>
+- **反馈与贡献**：欢迎提交 Issue，也欢迎 Pull Request。
 
-欢迎提交 Issue 与 Pull Request。
+快速获取源码：
+
+```bash
+git clone https://github.com/owod-bin/csins-llm-manager.git
+cd csins-llm-manager
+```
 
 ## ⚠️ 安全提示
 
