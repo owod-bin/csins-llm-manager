@@ -1,0 +1,48 @@
+# ============================================================
+#  运行时数据 —— 含 API Key 明文、管理员密码哈希、客户端 IP、
+#  调用记录。切勿提交到任何公开仓库。
+# ============================================================
+data/
+!data/.gitkeep
+
+# 本地配置（含个人机器上的绝对路径）—— 请改用 config.json.example
+config.json
+
+# ---------------- 日志 ----------------
+*.log
+*.log.*
+_mgr.log*
+_boot.log
+_run.out.log
+_restart_service.log
+_restart_out.txt
+
+# ---------------- 备份 / 临时文件 ----------------
+*.bak
+*.bak_*
+*.bak-*
+*.orig
+*.tmp
+*.swp
+
+# ---------------- 含明文凭据或内网 IP 的本地排障脚本 ----------------
+_start_model_now.py
+_verify_live.py
+_verify_maxtok_fix.py
+
+# ---------------- Python ----------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# ---------------- 编辑器 / 操作系统 ----------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

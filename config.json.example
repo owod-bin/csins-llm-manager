@@ -1,0 +1,16 @@
+{
+  "_说明": "复制本文件为 config.json 后按实际路径修改。config.json 已被 .gitignore 忽略，不会被提交。留空(\"\")的项表示使用程序内置默认值（项目目录下的相对路径）。",
+
+  "llama_cpp_dir": "C:\\llama.cpp",
+  "server_exe": "C:\\llama.cpp\\llama-server.exe",
+  "ai_model_dir": "D:\\models",
+
+  "data_dir": "",
+  "logs_dir": "",
+
+  "gateway_host": "0.0.0.0",
+  "gateway_port": 8000,
+  "internal_port_start": 18080,
+  "manager_host": "0.0.0.0",
+  "manager_port": 9090
+}

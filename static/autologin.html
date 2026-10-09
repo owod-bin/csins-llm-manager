@@ -1,0 +1,12 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>auto</title></head><body>
+<script>
+  // 获取 token 后跳转
+  fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{"password":"admin"}'})
+    .then(r=>r.json()).then(j=>{
+      if (j.data && j.data.token){
+        localStorage.setItem('llmgr_token', j.data.token);
+        location.replace('/');
+      } else { document.body.innerText = 'login failed: '+JSON.stringify(j); }
+    }).catch(e=>{ document.body.innerText = 'err: '+e.message; });
+</script>
+</body></html>

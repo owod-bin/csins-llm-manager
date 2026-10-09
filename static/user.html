@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>思考设置 · CSINS 大模型服务</title>
+<style>
+:root{--fg:#1f2329;--fg2:#6b7280;--bd:#e5e7eb;--bg:#f7f8fa;--card:#fff;--pri:#2563eb;--ok:#0f6e56;--warn:#a32d2d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6}
+.wrap{max-width:560px;margin:0 auto;padding:40px 20px}
+h1{font-size:18px;font-weight:500;margin:0 0 6px}
+.sub{color:var(--fg2);font-size:13px;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:20px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--fg2);margin-bottom:6px}
+input,select{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;font-size:14px;background:#fff;color:var(--fg)}
+select:disabled,input:disabled{background:#f1f2f4;color:var(--fg2)}
+button{margin-top:16px;width:100%;padding:10px;border:none;border-radius:8px;background:var(--pri);color:#fff;font-size:14px;cursor:pointer}
+button:disabled{background:#c7cbd1;cursor:not-allowed}
+.fr{margin-bottom:14px}
+.note{font-size:12px;color:var(--fg2);margin-top:6px}
+.lock{background:#fcebeb;border:1px solid #f7c1c1;color:var(--warn);border-radius:10px;padding:12px;font-size:13px;margin-bottom:16px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:6px;background:#e1f5ee;color:var(--ok);margin-left:6px}
+.tag.lock{background:#fcebeb;color:var(--warn);border:none;padding:2px 8px}
+.tip{font-size:12px;color:var(--fg2);margin-top:10px;line-height:1.9}
+code{background:#f1f2f4;padding:1px 5px;border-radius:4px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>思考设置</h1>
+  <div class="sub">CSINS 大模型服务 · 用你的 API Key 自行调整调用时的思考开关与强度</div>
+
+  <div id="lock" class="lock" style="display:none">
+    管理员已关闭「用户自定义思考」，当前由平台统一策略控制，你的修改不会生效。
+  </div>
+
+  <div class="card">
+    <div class="fr"><label>你的 API Key</label><input id="key" placeholder="sk-..." autocomplete="off"></div>
+    <button onclick="load()">查询当前设置</button>
+    <div class="tip">Key 仅保存在本机浏览器，不会上传到其他地方。</div>
+  </div>
+
+  <div class="card" id="panel" style="display:none">
+    <div style="margin-bottom:14px">使用者：<b id="who">-</b><span class="tag" id="src"></span></div>
+    <div class="fr"><label>思考开关</label>
+      <select id="mode">
+        <option value="inherit">跟随平台策略</option>
+        <option value="on">开启思考（推理更准，较慢）</option>
+        <option value="off">关闭思考（最快）</option>
+      </select></div>
+    <div class="fr"><label>思考强度</label>
+      <select id="effort">
+        <option value="inherit">跟随平台策略</option>
+        <option value="xhigh">高（深入推理）</option>
+        <option value="medium">中（平衡）</option>
+        <option value="low">低（简洁快速）</option>
+      </select>
+      <div class="note">强度属于提示词层面的引导，提速有限；要明显提速请选择「关闭思考」。</div></div>
+    <button id="save" onclick="save()">保存设置</button>
+    <div class="tip">保存后立即生效，客户端无需改动：<br>
+      · WorkBuddy 等客户端仍填同一网关地址即可<br>
+      · 若客户端自带思考参数（如 <code>/effort</code>），它会优先于这里的设置</div>
+  </div>
+</div>
+<script>
+var $ = function(id){ return document.getElementById(id); };
+var LOCKED = false;
+
+function call(path, opt){
+  opt = opt || {};
+  var key = ($("key").value || "").trim();
+  var headers = { "Content-Type": "application/json", "Authorization": "Bearer " + key };
+  var cfg = { method: (opt.method || "GET"), headers: headers };
+  if (opt.body) cfg.body = JSON.stringify(opt.body);
+  return fetch(path, cfg).then(function(r){
+    return r.json().catch(function(){ return { ok:false, error:"响应解析失败" }; }).then(function(j){
+      if (!r.ok || j.ok === false) throw new Error(j.error || ("HTTP " + r.status));
+      return j.data;
+    });
+  });
+}
+
+function load(){
+  var key = ($("key").value || "").trim();
+  if (!key) { alert("请先填写你的 API Key"); return; }
+  try { localStorage.setItem("csins_key", key); } catch (e) {}
+  call("/api/user/thinking").then(function(d){
+    $("panel").style.display = "block";
+    $("who").textContent = d.name || "-";
+    LOCKED = !d.allow_override;
+    $("src").textContent = LOCKED ? "已锁定" : "可自定义";
+    $("src").className = LOCKED ? "tag lock" : "tag";
+    $("lock").style.display = LOCKED ? "block" : "none";
+    $("mode").value = d.mode || "inherit";
+    $("effort").value = d.effort || "inherit";
+    $("mode").disabled = LOCKED;
+    $("effort").disabled = LOCKED;
+    $("save").disabled = LOCKED;
+  }).catch(function(e){
+    alert("查询失败：" + e.message);
+  });
+}
+
+function save(){
+  if (LOCKED) return;
+  call("/api/user/thinking", { method:"POST", body:{ mode: $("mode").value, effort: $("effort").value } })
+    .then(function(d){
+      alert("已保存：思考" + (d.mode === "off" ? "关闭" : d.mode === "on" ? "开启" : "跟随平台") +
+            "，强度" + (d.effort === "inherit" ? "跟随平台" : d.effort) + "。下次调用即生效。");
+    })
+    .catch(function(e){ alert("保存失败：" + e.message); });
+}
+
+(function(){
+  try {
+    var k = localStorage.getItem("csins_key");
+    if (k) { $("key").value = k; load(); }
+  } catch (e) {}
+})();
+</script>
+</body>
+</html>
