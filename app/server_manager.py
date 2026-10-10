@@ -1,6 +1,7 @@
 ﻿"""llama.cpp 服务进程管理：构建命令行、启停、健康检查。"""
 import os
 import shutil
+import socket
 import subprocess
 import threading
 import time
@@ -243,6 +244,32 @@ def _find_port_pid(port):
     return None
 
 
+def port_open(host, port, timeout=0.25):
+    """快速 TCP 探测：端口是否有人监听。
+
+    作为 attach() 的前置预检。直接发 HTTP 请求时，未监听的端口在 Windows 上
+    要等满 timeout 才返回（实测约 1.2 秒），多个未运行模型串行累加会让状态
+    接口耗时数秒。TCP 预检只需 ~0.2 秒即可判定"端口没开"。
+    """
+    if host in ("0.0.0.0", "", None):
+        host = "127.0.0.1"
+    try:
+        port = int(port)
+    except Exception:
+        return False
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.settimeout(timeout)
+    try:
+        return s.connect_ex((host, port)) == 0
+    except Exception:
+        return False
+    finally:
+        try:
+            s.close()
+        except Exception:
+            pass
+
+
 def _build_cmd_safe(model):
     try:
         return build_command(model)
@@ -262,6 +289,11 @@ def attach(model):
     with _LOCK:
         rt = _RUNTIME.get(mid)
         if rt is not None and _runtime_alive(rt):
+            return False
+    # 快速预检：端口无人监听就直接放弃，避免 HTTP 请求等满超时（性能关键路径）
+    if not is_external_engine(model):
+        _port = model.get("internal_port")
+        if _port and not port_open(model.get("host", "127.0.0.1"), _port, timeout=0.25):
             return False
     ok, _detail = health(model, timeout=1.2)
     if not ok:

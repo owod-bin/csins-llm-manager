@@ -55,6 +55,10 @@ BINARY_EXT = {
 
 SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", "dist", "build"}
 
+# 本脚本自身必然包含待匹配的模式串（例如弱口令正则的字面量），扫自己没有意义，
+# 只会持续产出误报。扫描对象一律排除本文件。
+SELF_NAME = os.path.basename(os.path.abspath(__file__))
+
 
 def git_files(root):
     """返回 git 已跟踪的文件（相对路径列表）；不在 git 仓库中则返回 None。"""
@@ -82,6 +86,8 @@ def walk_files(root):
 def scan(root, rel_paths):
     high_hits, warn_hits, scanned = [], [], 0
     for rel in rel_paths:
+        if os.path.basename(rel) == SELF_NAME:
+            continue
         if os.path.splitext(rel)[1].lower() in BINARY_EXT:
             continue
         full = os.path.join(root, rel)

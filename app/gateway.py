@@ -32,17 +32,59 @@ _MODEL_LAST_ACTIVE = {}       # model_id -> 最后一次请求结束的时间
 _SWITCH_GRACE_SEC = 60        # 距上次请求结束不足该秒数，视为“仍在使用”，不切换
                               # （可在系统设置里用 switch_grace_sec 覆盖，设为 0 即严格按在途请求判断）
 
+# “忙”的第二道保险：租约。
+# 光靠 ACTIVE_REQS 不够 —— (1) 流式响应在 Flask 的 after_request 里会提前归零，
+# (2) 冷启动期间请求还没被计数。租约在这两个窗口内把模型标记为“使用中”。
+_BUSY_LEASE_SEC = 300         # 单次占用租约（秒）；流式响应过程中每 10 秒续租一次
+_MODEL_BUSY_UNTIL = {}        # model_id -> 忙到该时间戳
+
+
+def _busy_begin(mid):
+    """开始占用：本次请求从此刻起视为“正在使用该模型”。"""
+    try:
+        _MODEL_BUSY_UNTIL[mid] = time.time() + _BUSY_LEASE_SEC
+    except Exception:
+        pass
+
+
+def _busy_touch(mid):
+    """续租（流式响应每收到一个数据块时调用），保证长任务期间不被判为空闲。"""
+    _busy_begin(mid)
+
+
+def _busy_cancel(mid):
+    """撤销尚未真正开始的占用（请求被拒绝时调用，不写“最后活跃时间”）。"""
+    try:
+        _MODEL_BUSY_UNTIL[mid] = 0
+    except Exception:
+        pass
+
+
+def _release(mid):
+    """结束一次占用：计数 -1；归零时记录最后活跃时间并释放租约（改由 grace 接管）。"""
+    try:
+        ACTIVE_REQS[mid] = max(0, ACTIVE_REQS.get(mid, 0) - 1)
+        if ACTIVE_REQS[mid] == 0:
+            _MODEL_LAST_ACTIVE[mid] = time.time()
+            _MODEL_BUSY_UNTIL[mid] = 0
+    except Exception:
+        pass
+
 
 @app.after_request
 def _decrement_active(response):
-    """请求结束后自动递减推理计数器，避免计数器需被多路径手动清理。"""
+    """请求结束后自动递减推理计数器，避免计数器需被多路径手动清理。
+
+    流式响应例外：其响应体是生成器，after_request 在数据产生之前就执行了，
+    此时递减会让长任务被误判为空闲。故流式请求置 g.stream_handled=True，
+    改由生成器的 finally 负责释放。
+    """
     try:
         from flask import g
-        mid = getattr(g, "active_mid", None)
-        if mid:
-            ACTIVE_REQS[mid] = max(0, ACTIVE_REQS.get(mid, 0) - 1)
-            if ACTIVE_REQS[mid] == 0:
-                _MODEL_LAST_ACTIVE[mid] = time.time()
+        if not getattr(g, "stream_handled", False):
+            mid = getattr(g, "active_mid", None)
+            if mid:
+                _release(mid)
         info = getattr(g, "ctx_guard_info", None)
         if info:
             response.headers["X-Ctx-Guard"] = info
@@ -150,8 +192,15 @@ def _ensure_running(model, wait=0):
 
 
 def _model_busy(mid, grace):
-    """模型是否正被使用：有在途请求，或距上次请求结束不足 grace 秒。"""
+    """模型是否正被使用。三重判断，任一成立即为“忙”：
+
+      1. 有在途请求（ACTIVE_REQS）
+      2. 仍在本模型的占用租约内 —— 覆盖流式响应、冷启动等 ACTIVE_REQS 失真的窗口
+      3. 距上次请求结束不足 grace 秒 —— 覆盖客户端刚断开、上游仍在收尾
+    """
     if ACTIVE_REQS.get(mid, 0) > 0:
+        return True
+    if time.time() < _MODEL_BUSY_UNTIL.get(mid, 0):
         return True
     if grace > 0:
         last = _MODEL_LAST_ACTIVE.get(mid, 0)
@@ -969,8 +1018,12 @@ def proxy(sub=None):
     if not _key_allows(key, model):
         return _cors(jsonify({"error": {"message": "该 API Key 无权访问模型 %s" % model_name, "type": "invalid_request_error", "code": "permission_denied"}})), 403
 
+    # 先占位、再确保就绪：冷启动可能耗时 10~180 秒，这段时间也必须让别的请求
+    # 看到“本模型正在被使用”，否则漫长的启动过程会被另一个客户端的请求顶掉。
+    _busy_begin(model["id"])
     _ok_start, _start_code, _start_msg = _ensure_started(model)
     if not _ok_start:
+        _busy_cancel(model["id"])
         return _cors(jsonify({"error": {"message": _start_msg or "模型暂时不可用",
                                         "type": "service_unavailable",
                                         "code": _start_code or "model_not_running"}})), 503
@@ -1081,10 +1134,18 @@ def proxy(sub=None):
                 if upstream.status_code != 200:
                     return _cors(Response(txt, status=upstream.status_code, mimetype="application/json"))
 
-            def gen():
+            _stream_mid = model["id"]
+            g.stream_handled = True   # 流式响应：计数与租约改由下面的 gen() 释放
+
+            def _stream_body():
                 usage = None
                 first_tok_at = None
+                _last_touch = 0.0
                 for raw in upstream.iter_lines(chunk_size=None):
+                    _now = time.time()
+                    if _now - _last_touch > 10:
+                        _busy_touch(_stream_mid)   # 续租：长任务期间保持“忙”
+                        _last_touch = _now
                     if raw is None:
                         continue
                     line = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
@@ -1122,6 +1183,14 @@ def proxy(sub=None):
                                  client_ip4=cip4, client_ip6=cip6)
                 except Exception:
                     pass  # 统计失败不得影响响应
+
+            def gen():
+                """包一层：无论正常结束、客户端断开还是上游异常，都释放占用。"""
+                try:
+                    for _chunk in _stream_body():
+                        yield _chunk
+                finally:
+                    _release(_stream_mid)
 
             resp = Response(gen(), mimetype="text/event-stream")
             resp.headers["Cache-Control"] = "no-cache"
